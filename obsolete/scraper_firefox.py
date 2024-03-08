@@ -4,10 +4,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
-# Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0
 
 options = Options()
-user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"
+user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/201 00101 Firefox/123.0"
 options.set_preference("general.useragent.override", user_agent) # Set user agent to bypass website blocking
 options.set_preference("dom.webdriver.enabled", False) # Disable webdriver mode to bypass website blocking
 
