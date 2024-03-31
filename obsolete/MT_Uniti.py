@@ -10,15 +10,16 @@ import random
 import csv
 import concurrent.futures
 
-chunk = 7
-in_file = "fix1.csv"
-out_file = "fix1_output.csv"
+chunk = 3000
+input_file = "underserved20K.csv"
+output_file = "TestOutput.csv"
 
 ### SET UP BROWSER PREFERENCES
 options = Options()
 user_agent = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"
 options.set_preference("general.useragent.override", user_agent) # Set user agent to bypass website blocking
 options.set_preference("dom.webdriver.enabled", False) # Disable webdriver mode to bypass website blocking
+options.add_argument("--headless")
 
 ### SINGLE ADDRESS SCRAPING FUNCTION
 def search_address(address, driver, wait, searchBar, searchButton, retries):
@@ -27,40 +28,37 @@ def search_address(address, driver, wait, searchBar, searchButton, retries):
         return "website error, skipping address"
     searchBar.clear()
     searchBar.send_keys(address) # Send address
-    
     try:
-        WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.searchBtn:nth-child(2)")))
-        searchButton.click()
+        # Find the obscuring element
+        loadingIndicator = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "jimu_dijit_LoadingIndicator_1")))
+        # Wait until the obscuring element is no longer visible
+        wait.until(EC.invisibility_of_element(loadingIndicator))
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.searchBtn:nth-child(2)"))) # ADDED AT 2 AM MIGHT BE BUGGY WORKEd out it but slow
+        searchButton.click() # Click on searh button
+    except TimeoutException: # ElementClickInterceptedException: #should be timeoutexception
+        # Find the obscuring element
+        # loadingIndicator = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "jimu_dijit_LoadingIndicator_1")))
+        # Wait until the obscuring element is no longer visible
+        # wait.until(EC.invisibility_of_element(loadingIndicator))
+        # searchButton.click()
+        try:
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.searchBtn:nth-child(2)")))
+            searchButton.click()
+        except ElementClickInterceptedException:
+            time.sleep(random.randint(3, 8))
+            return search_address(address, driver, wait, searchBar, searchButton, retries-1)
     except ElementClickInterceptedException:
         try:
-            # Find the obscuring element
-            loadingIndicator = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, "jimu_dijit_LoadingIndicator_1")))
-            # Wait until the obscuring element is no longer visible
-            wait.until(EC.invisibility_of_element(loadingIndicator))
-            WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.searchBtn:nth-child(2)"))) # ADDED AT 2 AM MIGHT BE BUGGY WORKEd out it but slow
-            searchButton.click() # Click on searh button
-        except TimeoutException: # ElementClickInterceptedException: #should be timeoutexception
-            # Find the obscuring element
-            # loadingIndicator = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "jimu_dijit_LoadingIndicator_1")))
-            # Wait until the obscuring element is no longer visible
-            # wait.until(EC.invisibility_of_element(loadingIndicator))
-            # searchButton.click()
-            print("Timed out. Could not click search button. Retrying...")
-            return search_address(address, driver, wait, searchBar, searchButton, retries-1)
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.searchBtn:nth-child(2)")))
+            searchButton.click()
         except ElementClickInterceptedException:
-            try:
-                ok_button = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//div[text()='OK']")))
-                ok_button.click()
-                print("Pop up detected. Closing pop up and retrying...")
-                return search_address(address, driver, wait, searchBar, searchButton, retries-1)
-            except TimeoutException:
-                time.sleep(random.randint(3, 8))
-                print("ElementClickInterceptedException. Could not find pop up. Need debugging. Retrying...")
-                return search_address(address, driver, wait, searchBar, searchButton, retries-1)
-        time.sleep(1.5)
+            time.sleep(random.randint(3, 8))
+            return search_address(address, driver, wait, searchBar, searchButton, retries-1)
+    time.sleep(1.5)
+    
     try:
         # Address is not served indicator
-        WebDriverWait(driver, 7).until(EC.presence_of_element_located((By.CLASS_NAME, "esriCTNoFeatureFound"))) # LOOK FOR BOTH AT THE SAME TIME
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "esriCTNoFeatureFound"))) # LOOK FOR BOTH AT THE SAME TIME
         availability = "unavailable"
     except TimeoutException:
         try: # Address is served indicator
@@ -68,7 +66,6 @@ def search_address(address, driver, wait, searchBar, searchButton, retries):
             availability = "available"
         except TimeoutException:
             try: # Find unable to fetch results from layers pop-up
-                print("Unable to fetch availability. Retrying...")
                 ok_button = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//div[text()='OK']")))
                 # should be only button in the iframe
                 # there is two buttons, one of them is unclickable. work on finding the one that's clickable
@@ -79,7 +76,7 @@ def search_address(address, driver, wait, searchBar, searchButton, retries):
                 print("Website timed out. Retrying...")
                 return search_address(address, driver, wait, searchBar, searchButton, retries-1)
             except TimeoutException:
-                print("Unable to fetch availability. Retrying...")
+                print("Slow internet. Retrying...")
                 time.sleep(random.randint(3, 8))
                 return search_address(address, driver, wait, searchBar, searchButton, retries-1)
                 
@@ -104,7 +101,7 @@ def process(data):
         ### SEARCH AND SCRAPE
         for row in data[1:(chunk+1)]:
             address = ", ".join(row[2:6])
-            availability = search_address(address, driver, wait, searchBar, searchButton, 5)
+            availability = search_address(address, driver, wait, searchBar, searchButton, 3)
             row[7] = availability
             offset = random.randint(-20, 20) # Scrol down to range with random offset
             driver.execute_script(f"window.scrollBy(0, {offset});")
@@ -124,14 +121,14 @@ def process(data):
     return data
 
 ### INITIALIZE MULTITHREADING
-with open(in_file, "r") as file:
+with open(input_file, "r") as file:
     reader = csv.reader(file)
     data = list(reader)
 chunks = [data[i:i + chunk] for i in range(0, len(data), chunk)]
 with concurrent.futures.ThreadPoolExecutor() as executor:
     processed_data = list(executor.map(process, chunks))
 flattened_processed_data = [item for sublist in processed_data for item in sublist]
-with open(out_file, "w", newline='') as file:
+with open(output_file, "w", newline='') as file:
     writer = csv.writer(file)
     writer.writerows(flattened_processed_data)
 
@@ -149,5 +146,3 @@ with open(out_file, "w", newline='') as file:
 
 # Exception occurred: Message: Element <div class="searchBtn searchSubmit"> is not clickable at point (326,222) because another element <div class="jimu-overlay"> obscures it
 # Do a single thread test that makes the webdriver take a screenshot and pause when the exception happens, to see what that jim-overlay is doing. Maybe it's a loading screen that's not being waited for.
-
-# the jim-overlay is the thing that tells you the location. just needs to click the x to close it.
