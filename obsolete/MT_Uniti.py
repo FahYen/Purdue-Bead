@@ -11,8 +11,8 @@ import csv
 import concurrent.futures
 
 chunk = 3000
-input_file = "underserved20K.csv"
-output_file = "TestOutput.csv"
+input_file = "underserved.csv"
+output_file = "output.csv"
 
 ### SET UP BROWSER PREFERENCES
 options = Options()

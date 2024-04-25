@@ -10,7 +10,7 @@ import random
 import csv
 import concurrent.futures
 
-chunk = 7
+chunk = 4
 in_file = "fix1.csv"
 out_file = "fix1_output.csv"
 
